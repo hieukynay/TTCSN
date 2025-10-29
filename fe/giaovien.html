@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trang Giáo viên • EnglishCenter</title>
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<header class="site-header">
+  <nav class="nav container">
+    <a class="brand" href="index.html">EnglishCenter</a>
+    <ul class="nav-list">
+      <li class="active"><a href="giaovien.html">Trang giáo viên</a></li>
+      <li><a href="#" id="logoutBtn">Đăng xuất</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main class="container">
+  <h1>Xin chào, Giáo viên 👋</h1>
+
+  <section class="card">
+    <h2>Tạo lớp mới</h2>
+    <div class="form grid-2">
+      <label><span>Tên lớp</span><input id="tenLopHoc" type="text" placeholder="IELTS 6.5 - A1" /></label>
+      <label><span>Lịch học</span><input id="lichHoc" type="text" placeholder="T2-T4 18:00-20:00" /></label>
+      <label><span>Phòng học</span><input id="phongHoc" type="text" placeholder="P301" /></label>
+      <label><span>Mã khóa học (tuỳ)</span><input id="maKhoaHoc" type="number" placeholder="VD: 5" /></label>
+      <div><button id="createClassBtn" class="btn">Tạo lớp</button></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Các lớp phụ trách</h2>
+    <table id="classTbl">
+      <thead><tr><th>Mã lớp</th><th>Tên lớp</th><th>Khóa học</th><th>Phòng</th><th>Lịch</th><th>Thao tác</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Thêm học viên vào lớp</h2>
+    <div class="form grid-2">
+      <label><span>Mã lớp</span><input id="addClassId" type="number" placeholder="VD: 101" /></label>
+      <label><span>Mã học viên</span><input id="addStudentId" type="number" placeholder="VD: 1001" /></label>
+      <div><button id="addStudentBtn" class="btn">Thêm</button></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Bài tập của lớp</h2>
+    <div class="form grid-2">
+      <label><span>Mã lớp</span><input id="asmClassId" type="number" /></label>
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <button id="loadAsmBtn" class="btn">Tải bài tập</button>
+        <button id="createAsmBtn" class="btn btn-outline">Tạo bài tập</button>
+      </div>
+      <label style="grid-column:1 / -1;"><span>Tiêu đề bài tập (khi tạo)</span><input id="asmTitle" type="text" placeholder="Homework 01" /></label>
+    </div>
+    <table id="asmTbl">
+      <thead><tr><th>ID</th><th>Tiêu đề</th><th>Hạn nộp</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Nhập điểm</h2>
+    <div class="form grid-2">
+      <label><span>Mã học viên</span><input id="gradeHv" type="number" /></label>
+      <label><span>Mã lớp</span><input id="gradeClass" type="number" /></label>
+      <label><span>Điểm</span><input id="gradeScore" type="number" step="0.1" /></label>
+      <div><button id="gradeBtn" class="btn">Lưu điểm</button></div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer"><div class="container"><p>© 2025 EnglishCenter.</p></div></footer>
+<script src="assets/app.js"></script>
+<script>
+  const auth = requireRole('GiaoVien');
+  if (!auth) throw new Error('No auth');
+
+  const tbody = document.querySelector('#classTbl tbody');
+  const tbodyAsm = document.querySelector('#asmTbl tbody');
+
+  async function loadClasses(){
+    tbody.innerHTML = '<tr><td colspan="6" class="muted">Đang tải...</td></tr>';
+    try{
+      const res = await TeacherAPI.listClasses(); const data = await res.json();
+      if (!data || !data.length){ tbody.innerHTML = '<tr><td colspan="6" class="muted">Chưa có lớp.</td></tr>'; return; }
+      tbody.innerHTML = data.map(l=>`
+        <tr>
+          <td>${l.maLopHoc ?? '-'}</td>
+          <td>${l.tenLopHoc ?? '-'}</td>
+          <td>${l.khoaHoc?.tenKhoaHoc ?? '-'}</td>
+          <td>${l.phongHoc ?? '-'}</td>
+          <td>${l.lichHoc ?? '-'}</td>
+          <td>
+            <button class="btn btn-sm" onclick="viewStudents(${l.maLopHoc})">Học viên</button>
+            <button class="btn btn-sm" onclick="delClass(${l.maLopHoc})">Xoá</button>
+          </td>
+        </tr>`).join('');
+    }catch{ tbody.innerHTML = '<tr><td colspan="6" class="msg error">Lỗi tải dữ liệu.</td></tr>'; }
+  }
+  window.viewStudents = async (classId)=>{
+    try{
+      const res = await TeacherAPI.listStudents(classId); const data = await res.json();
+      alert('Học viên lớp ' + classId + ':\n' + (data.map(d=> (d.hocVien?.taiKhoan?.hoTen || 'HV ' + (d.hocVien?.maHocVien||''))).join('\n') || '—'));
+    }catch{ alert('Không tải được danh sách'); }
+  };
+  window.delClass = async (id)=>{
+    if (!confirm('Xoá lớp ' + id + '?')) return;
+    try{ await TeacherAPI.deleteClass(id); loadClasses(); }catch{ alert('Xoá thất bại'); }
+  };
+
+  document.getElementById('createClassBtn').onclick = async ()=>{
+    const lopHoc = {
+      tenLopHoc: document.getElementById('tenLopHoc').value.trim(),
+      lichHoc: document.getElementById('lichHoc').value.trim(),
+      phongHoc: document.getElementById('phongHoc').value.trim(),
+      khoaHoc: (v=> v ? { maKhoaHoc: parseInt(v,10) } : null)(document.getElementById('maKhoaHoc').value)
+    };
+    try{ const r = await TeacherAPI.createClass(lopHoc); if (!r.ok) throw 0; alert('Tạo lớp thành công'); loadClasses(); }
+    catch{ alert('Tạo lớp thất bại'); }
+  };
+
+  document.getElementById('addStudentBtn').onclick = async ()=>{
+    const classId = parseInt(document.getElementById('addClassId').value, 10);
+    const hvId    = parseInt(document.getElementById('addStudentId').value, 10);
+    if (!classId || !hvId) { alert('Nhập đủ mã lớp & mã học viên'); return; }
+    try{
+      const res = await TeacherAPI.addStudent(classId, { maHocVien: hvId });
+      if (!res.ok) throw 0; alert('Thêm học viên thành công');
+    }catch{ alert('Thêm học viên thất bại'); }
+  };
+
+  document.getElementById('loadAsmBtn').onclick = async ()=>{
+    const classId = parseInt(document.getElementById('asmClassId').value, 10);
+    if (!classId){ alert('Nhập mã lớp'); return; }
+    tbodyAsm.innerHTML = '<tr><td colspan="3" class="muted">Đang tải...</td></tr>';
+    try{
+      const res = await TeacherAPI.listAssignments(classId); const data = await res.json();
+      if (!data || !data.length){ tbodyAsm.innerHTML = '<tr><td colspan="3" class="muted">Chưa có bài tập.</td></tr>'; return; }
+      tbodyAsm.innerHTML = data.map(a=>`
+        <tr><td>${a.id ?? '-'}</td><td>${a.tieuDe ?? '-'}</td><td>${a.hanNop ?? '-'}</td></tr>
+      `).join('');
+    }catch{ tbodyAsm.innerHTML = '<tr><td colspan="3" class="msg error">Lỗi tải dữ liệu.</td></tr>'; }
+  };
+
+  document.getElementById('createAsmBtn').onclick = async ()=>{
+    const classId = parseInt(document.getElementById('asmClassId').value, 10);
+    const title   = document.getElementById('asmTitle').value.trim();
+    if (!classId || !title){ alert('Nhập mã lớp và tiêu đề'); return; }
+    const asm = { tieuDe: title, lopHoc: { id: classId } };
+    try{ const r = await TeacherAPI.createAssignment(asm); if (!r.ok) throw 0; alert('Tạo bài tập thành công'); }
+    catch{ alert('Tạo bài tập thất bại'); }
+  };
+
+  document.getElementById('gradeBtn').onclick = async ()=>{
+    const hv  = parseInt(document.getElementById('gradeHv').value,10);
+    const cls = parseInt(document.getElementById('gradeClass').value,10);
+    const sc  = parseFloat(document.getElementById('gradeScore').value);
+    if (!hv || !cls || isNaN(sc)){ alert('Nhập đủ thông tin'); return; }
+    const diem = { hocVien: { maHocVien: hv }, lopHoc: { maLopHoc: cls }, diemSo: sc };
+    try{ const r = await TeacherAPI.grade(diem); if (!r.ok) throw 0; alert('Lưu điểm thành công'); }
+    catch{ alert('Lưu điểm thất bại'); }
+  };
+
+  loadClasses();
+</script>
+</body>
+</html>

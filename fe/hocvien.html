@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trang Học viên • EnglishCenter</title>
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<header class="site-header">
+  <nav class="nav container">
+    <a class="brand" href="index.html">EnglishCenter</a>
+    <ul class="nav-list">
+      <li class="active"><a href="hocvien.html">Trang học viên</a></li>
+      <li><a href="#" id="logoutBtn">Đăng xuất</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main class="container">
+  <h1>Xin chào, Học viên 👋</h1>
+
+  <!-- Lớp đang mở + đăng ký -->
+  <section class="card">
+    <h2>Lớp đang mở</h2>
+    <div class="form grid-2">
+      <label><span>Nhập ID lớp để đăng ký</span><input id="enrollClassId" type="number" placeholder="VD: 101" /></label>
+      <div><button id="enrollBtn" class="btn">Đăng ký lớp</button></div>
+    </div>
+    <table id="openClasses">
+      <thead><tr><th>Mã lớp</th><th>Tên lớp</th><th>Khóa học</th><th>Phòng</th><th>Lịch</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- Bài tập -->
+  <section class="card">
+    <h2>Bài tập</h2>
+    <div class="form grid-2">
+      <label><span>Mã lớp để tải bài tập</span><input id="asmClassId" type="number" placeholder="VD: 101" /></label>
+      <div><button id="loadAsmBtn" class="btn">Tải danh sách bài tập</button></div>
+    </div>
+    <table id="asmTbl">
+      <thead><tr><th>ID</th><th>Tiêu đề</th><th>Hạn nộp</th><th>Nộp bài</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- Thanh toán -->
+  <section class="card">
+    <h2>Thanh toán học phí</h2>
+    <div class="form grid-2">
+      <label><span>Số tiền (VND)</span><input id="payAmount" type="number" value="500000" step="1000" /></label>
+      <label><span>Ghi chú</span><input id="payNote" type="text" placeholder="Học phí tháng..." /></label>
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <button id="payBtn" class="btn">Tạo giao dịch (nội bộ)</button>
+        <button id="momoBtn" class="btn btn-outline">Thanh toán MoMo</button>
+      </div>
+    </div>
+    <h3>Lịch sử thanh toán</h3>
+    <table id="payTable">
+      <thead><tr><th>Thời gian</th><th>Số tiền</th><th>Phương thức</th><th>Trạng thái</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- Lịch học -->
+  <section class="card">
+    <h2>Lịch học</h2>
+    <table id="scheduleTbl">
+      <thead><tr><th>Ngày</th><th>Bắt đầu</th><th>Kết thúc</th><th>Mã lớp</th><th>Phòng</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</main>
+
+<footer class="site-footer"><div class="container"><p>© 2025 EnglishCenter.</p></div></footer>
+<script src="assets/app.js"></script>
+<script>
+  const auth = requireRole('HocVien');
+  if (!auth) throw new Error('No auth');
+
+  const tbodyOpen = document.querySelector('#openClasses tbody');
+  const tbodyPay  = document.querySelector('#payTable tbody');
+  const tbodySch  = document.querySelector('#scheduleTbl tbody');
+  const tbodyAsm  = document.querySelector('#asmTbl tbody');
+
+  async function loadOpenClasses(){
+    tbodyOpen.innerHTML = '<tr><td colspan="5" class="muted">Đang tải...</td></tr>';
+    try{
+      const res = await StudentAPI.listOpenClasses(); const data = await res.json();
+      if (!data || !data.length){ tbodyOpen.innerHTML = '<tr><td colspan="5" class="muted">Chưa có lớp.</td></tr>'; return; }
+      tbodyOpen.innerHTML = data.map(l=>`
+        <tr>
+          <td>${l.maLopHoc ?? '-'}</td>
+          <td>${l.tenLopHoc ?? '-'}</td>
+          <td>${l.khoaHoc?.tenKhoaHoc ?? '-'}</td>
+          <td>${l.phongHoc ?? '-'}</td>
+          <td>${l.lichHoc ?? '-'}</td>
+        </tr>`).join('');
+    }catch{ tbodyOpen.innerHTML = '<tr><td colspan="5" class="msg error">Lỗi tải dữ liệu.</td></tr>'; }
+  }
+
+  document.getElementById('enrollBtn').onclick = async ()=>{
+    const id = parseInt(document.getElementById('enrollClassId').value, 10);
+    if (!id){ alert('Nhập mã lớp hợp lệ'); return; }
+    try{ 
+      const res = await StudentAPI.enrollClass(id, auth.userId);
+      if (!res.ok) throw new Error();
+      alert('Đăng ký thành công!');
+    }catch{ alert('Đăng ký thất bại'); }
+  };
+
+  // Assignments
+  document.getElementById('loadAsmBtn').onclick = async ()=>{
+    const classId = parseInt(document.getElementById('asmClassId').value, 10);
+    if (!classId){ alert('Nhập mã lớp'); return; }
+    tbodyAsm.innerHTML = '<tr><td colspan="4" class="muted">Đang tải...</td></tr>';
+    try{
+      const res = await StudentAPI.listAssignments(classId); const data = await res.json();
+      if (!data || !data.length){ tbodyAsm.innerHTML = '<tr><td colspan="4" class="muted">Chưa có bài tập.</td></tr>'; return; }
+      tbodyAsm.innerHTML = data.map(a=>`
+        <tr>
+          <td>${a.id ?? a.maBaiTap ?? '-'}</td>
+          <td>${a.tieuDe ?? '-'}</td>
+          <td>${a.hanNop ?? '-'}</td>
+          <td>
+            <details>
+              <summary>Nộp bài</summary>
+              <div class="form" style="margin-top:8px">
+                <label><span>Nội dung trả lời</span><textarea id="ans-${a.id}"></textarea></label>
+                <label><span>File (tuỳ chọn)</span><input type="file" id="file-${a.id}" /></label>
+                <button class="btn btn-sm" onclick="submitAsm(${a.id})">Gửi</button>
+              </div>
+            </details>
+          </td>
+        </tr>`).join('');
+    }catch{ tbodyAsm.innerHTML = '<tr><td colspan="4" class="msg error">Lỗi tải dữ liệu.</td></tr>'; }
+  };
+
+  window.submitAsm = async (asmId)=>{
+    try{
+      const text = document.getElementById('ans-'+asmId)?.value || '';
+      const file = document.getElementById('file-'+asmId)?.files?.[0] || null;
+      const r = await StudentAPI.submitAssignment(asmId, auth.userId, text, file);
+      if (!r.ok) throw 0;
+      alert('Nộp bài thành công!');
+    }catch{ alert('Nộp bài thất bại'); }
+  };
+
+  // Payments
+  async function loadPayments(){
+    tbodyPay.innerHTML = '<tr><td colspan="4" class="muted">Đang tải...</td></tr>';
+    try{
+      const res = await StudentAPI.paymentHistory(auth.userId);
+      const data = await res.json();
+      if (!data || !data.length){ tbodyPay.innerHTML = '<tr><td colspan="4" class="muted">Chưa có giao dịch.</td></tr>'; return; }
+      tbodyPay.innerHTML = data.map(p=>`
+        <tr><td>${p.thoiGian ?? '-'}</td><td>${p.soTien ?? '-'}</td><td>${p.phuongThuc ?? '-'}</td><td>${p.trangThai ?? '-'}</td></tr>
+      `).join('');
+    }catch{ tbodyPay.innerHTML = '<tr><td colspan="4" class="msg error">Lỗi tải dữ liệu.</td></tr>'; }
+  }
+  document.getElementById('payBtn').onclick = async ()=>{
+    const amount = parseInt(document.getElementById('payAmount').value, 10) || 0;
+    const note   = document.getElementById('payNote').value.trim();
+    try{
+      const res = await StudentAPI.createPayment(auth.userId, { soTien: amount, phuongThuc:'Online', ghiChu: note });
+      if (!res.ok) throw new Error();
+      alert('Tạo giao dịch thành công!');
+      loadPayments();
+    }catch{ alert('Lỗi tạo giao dịch'); }
+  };
+  document.getElementById('momoBtn').onclick = async ()=>{
+    const amount = parseInt(document.getElementById('payAmount').value, 10) || 0;
+    try{
+      const resp = await MomoAPI.create(String(amount), 'Thanh toan hoc phi');
+      const data = await resp.json().catch(()=> ({}));
+      const url = data.payUrl || data.redirectUrl || data.url;
+      if (url) location.href = url;
+      else alert('Đã tạo giao dịch MoMo (sandbox), nhưng chưa có URL trả về.');
+    }catch{ alert('Không tạo được thanh toán MoMo'); }
+  };
+
+  // Schedule
+  async function loadSchedule(){
+    tbodySch.innerHTML = '<tr><td colspan="5" class="muted">Đang tải...</td></tr>';
+    try{
+      const res = await ScheduleAPI.me(); const data = await res.json();
+      if (!data || !data.length){ tbodySch.innerHTML = '<tr><td colspan="5" class="muted">Chưa có lịch.</td></tr>'; return; }
+      tbodySch.innerHTML = data.map(s=>`
+        <tr><td>${s.ngay}</td><td>${s.gioBatDau}</td><td>${s.gioKetThuc}</td><td>${s.maLopHoc}</td><td>${s.phongHoc ?? '-'}</td></tr>
+      `).join('');
+    }catch{ tbodySch.innerHTML = '<tr><td colspan="5" class="msg error">Lỗi tải dữ liệu.</td></tr>'; }
+  }
+
+  loadOpenClasses(); loadPayments(); loadSchedule();
+</script>
+</body>
+</html>
